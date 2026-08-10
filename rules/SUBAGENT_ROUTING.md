@@ -28,7 +28,26 @@ Select custom agents by their exact `name` from `~/.codex/agents`:
 - Multi-file behavior change, debugging, or substantial tests -> `implementer`
 - Focused read-only test, build, lint, or type-check execution -> `code-validator`
 - Independent review only for high-risk, security-sensitive, architectural, public-API, migration, concurrency, or difficult-to-validate changes -> `code-reviewer`
+- Escalation-only deep review — never a default or second pass; only when the standard `code-reviewer` or parent cannot reach a high-confidence verdict, or when deeper architectural, security, concurrency, migration, public-API, or cross-module invariant analysis is explicitly requested -> `code-reviewer-deep`
 - Commit and push, only when the user explicitly requests both -> `commit-pusher`
+
+## Escalation-Only Deep Review
+
+`code-reviewer-deep` is an escalation path only — never a default reviewer, and never a second-pass reviewer run automatically after `code-reviewer`. `code-reviewer` remains the default for independent review of qualifying high-risk, security-sensitive, architectural, public-API, migration, concurrency, or difficult-to-validate changes.
+
+Use `code-reviewer-deep` only when at least one of the following holds:
+
+1. The standard `code-reviewer` or the parent explicitly concludes that a high-confidence verdict is not achievable without deeper review.
+2. An unresolved material risk requires deeper architectural, security, concurrency, migration, public-API, or cross-module invariant reasoning than the standard reviewer performs.
+3. The user or orchestrator explicitly requests a deep review.
+
+Never escalate automatically. In particular, do not invoke `code-reviewer-deep`:
+
+- after `code-reviewer` as a routine second pass;
+- because a change is high-risk, security-sensitive, architectural, public-API, migration, or concurrency-related;
+- merely because the review surfaced P0/P1 findings.
+
+When the standard `code-reviewer` can reach a confident verdict, stop there — do not escalate solely because the change is high-stakes.
 
 Do not use a fixed command-count threshold for exploration. Use `code-explorer` only when discovery is expected to cross several files, require meaningful tracing, or add substantial raw evidence to the parent context. Do not use it to reread known files.
 
