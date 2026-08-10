@@ -29,6 +29,7 @@ Select custom agents by their exact `name` from `~/.codex/agents`:
 - Focused read-only test, build, lint, or type-check execution -> `code-validator`
 - Independent review only for high-risk, security-sensitive, architectural, public-API, migration, concurrency, or difficult-to-validate changes -> `code-reviewer`
 - Escalation-only deep review — never a default or second pass; only when the standard `code-reviewer` or parent cannot reach a high-confidence verdict, or when deeper architectural, security, concurrency, migration, public-API, or cross-module invariant analysis is explicitly requested -> `code-reviewer-deep`
+- Exploratory black-box UX review for qualifying user-facing frontend changes after functional validation -> `ux-reviewer`
 - Commit and push, only when the user explicitly requests both -> `commit-pusher`
 
 ## Escalation-Only Deep Review
@@ -80,6 +81,41 @@ Routing defines the validation policy; the plan defines the specific validation 
 Conversely, when a plan already defines sufficient final verification, do not unconditionally re-run the whole-suite, integration, or E2E checks again. Add extra validation only when another accepted plan, a release gate, a task requirement, or a new risk explicitly requires it.
 
 Distinguish clearly between task validation, plan completion, and version/release acceptance. Completing a plan proves only that plan's scope. If the plan is one workstream of a larger version or release, do not declare the whole version release-ready on its basis; follow the governing version/release acceptance plan.
+
+## Frontend UX Acceptance Gate
+
+Trigger `ux-reviewer` only for qualifying user-facing frontend changes, for example:
+
+- new or significantly changed user journey;
+- navigation, routing, or hierarchy changes;
+- modal, drawer, assistant, or panel lifecycle changes;
+- stateful interactions;
+- multi-step workflows;
+- reversible interactions;
+- persistent UI state;
+- error/recovery paths;
+- a frontend plan/workstream with material interaction changes;
+- the user or plan explicitly requests UX review.
+
+Do not trigger UX review by default for: typos, simple copy changes, trivial style-only changes, non-interactive icon replacements, internal refactors, or behavior-preserving mechanical frontend changes.
+
+Execution order:
+
+Implementation -> functional/task validation -> required E2E/build -> `ux-reviewer` -> plan acceptance
+
+When a UX finding is an implementation defect:
+
+`ux-reviewer` -> parent classifies -> `implementer`/`quick-implementer` -> deterministic regression test when appropriate -> `code-validator` -> targeted UX re-review
+
+When a correct fix requires changing accepted UX design:
+
+`ux-reviewer` -> `UX_DESIGN_REVIEW_REQUIRED` -> stop the affected UX workstream -> design/planning authority -> update the accepted UX/plan -> resume implementation
+
+The Main Agent must not silently redesign accepted UX on its own.
+
+Regression closure: for confirmed deterministic UX0/UX1 findings, add a focused automated regression test when feasible. For issues that are primarily UX requirements, discoverability, or wording, do not force brittle E2E coverage; update the accepted UX requirement when necessary.
+
+Cost control: do not run UX review for every frontend change; do not re-run a full exploratory sweep after every fix; default to a targeted re-review of the affected journey; re-run a full UX sweep only when there is cross-journey impact, a new risk, or the plan explicitly requires it.
 
 Do not use a fixed command-count threshold for exploration. Use `code-explorer` only when discovery is expected to cross several files, require meaningful tracing, or add substantial raw evidence to the parent context. Do not use it to reread known files.
 
