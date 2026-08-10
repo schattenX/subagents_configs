@@ -4,7 +4,7 @@ Optimize monetary cost above latency and total tokens. Delegate repository explo
 
 At the start of a broad task, delegate qualifying workstreams or state why delegation is not worthwhile. Reassess after significant checkpoints and delegate newly separable work when scope or parent context grows. The user need not request subagents explicitly.
 
-The parent agent retains ownership of architectural decisions, experiment selection, integration, and concise final validation. Delegate bounded workstreams, not the overall objective. Keep tightly coupled experiment-selection loops in the parent; delegate experiment execution or result analysis when independently separable. Every delegated implementation task must have explicit, non-overlapping file or module ownership; agents share the workspace, must preserve unrelated edits, and must accommodate concurrent changes.
+The parent agent retains ownership of task orchestration, integration, experiment selection, local implementation decisions within the accepted architecture and plan, and final acceptance. The accepted architecture, public contracts, module boundaries, persistent schema contracts, and critical plan assumptions are execution constraints; the parent must not silently overturn them. Delegate bounded workstreams, not the overall objective. Keep tightly coupled experiment-selection loops in the parent; delegate experiment execution or result analysis when independently separable. Every delegated implementation task must have explicit, non-overlapping file or module ownership; agents share the workspace, must preserve unrelated edits, and must accommodate concurrent changes.
 
 Execute directly only for truly trivial operations where agent startup would exceed the work: a single known-line edit, one short command, or a factual response. Do not delegate trivial conversation. The parent may run ordinary commands needed for routing, integration, or concise final verification, but should delegate repository execution rather than handling substantial discovery, implementation, conflict resolution, or review itself. A slow command alone is not a reason to delegate runner work; use an execution agent when diagnosis, output analysis, or independent parallel execution is substantial.
 
@@ -48,6 +48,38 @@ Never escalate automatically. In particular, do not invoke `code-reviewer-deep`:
 - merely because the review surfaced P0/P1 findings.
 
 When the standard `code-reviewer` can reach a confident verdict, stop there — do not escalate solely because the change is high-stakes.
+
+## Architecture Deviation Gate
+
+The parent may decide freely on implementation details that do not change the accepted architecture or its contracts, including private/internal implementation details, helper/function/class organization, local naming, test fixture details, and other local implementation choices.
+
+If implementation would require changing an accepted architecture boundary, module ownership, public API or published port, persistent schema contract, critical data flow, concurrency/transaction model, security/trust boundary, explicit architectural invariant, or critical architecture/plan assumption, the Architecture Deviation Gate is triggered.
+
+When the gate is triggered:
+
+1. Stop the affected workstream immediately.
+2. Do not implement the deviation first and then request approval.
+3. Report the accepted decision or constraint, the evidence showing why it is problematic, the proposed deviation, the affected modules/contracts, and viable alternatives.
+4. Escalate to the architecture/planning authority.
+5. Resume the affected workstream only after the deviation is explicitly accepted and the relevant architecture/plan has been updated.
+
+If `code-reviewer-deep` reports `ARCHITECTURE_DEVIATION`, it enters the same gate. Reviewers discover and report deviations; they do not approve architecture.
+
+## Plan Completion Gate Compliance
+
+When executing an implementation plan, every completion gate, acceptance gate, final verification command, and completion criterion written into the plan is mandatory. Passing every task-level `code-validator` check does not by itself mark the plan complete.
+
+A plan is complete only when all of the following hold:
+
+1. All required task-level validation passes.
+2. All plan-defined completion and final-verification gates pass.
+3. All explicit behavioral and acceptance criteria are met.
+
+Routing defines the validation policy; the plan defines the specific validation scope. Do not substitute a generic affected-test policy for the plan's final gate.
+
+Conversely, when a plan already defines sufficient final verification, do not unconditionally re-run the whole-suite, integration, or E2E checks again. Add extra validation only when another accepted plan, a release gate, a task requirement, or a new risk explicitly requires it.
+
+Distinguish clearly between task validation, plan completion, and version/release acceptance. Completing a plan proves only that plan's scope. If the plan is one workstream of a larger version or release, do not declare the whole version release-ready on its basis; follow the governing version/release acceptance plan.
 
 Do not use a fixed command-count threshold for exploration. Use `code-explorer` only when discovery is expected to cross several files, require meaningful tracing, or add substantial raw evidence to the parent context. Do not use it to reread known files.
 
