@@ -1,8 +1,52 @@
 #!/bin/sh
 set -eu
 CODEX_HOME=${CODEX_HOME:-"$HOME/.codex"}
+python_probe() {
+  case "$1" in
+    py)
+      py -3 -c 'import sys; print("__subagents_configs_python_ok__" if sys.version_info >= (3, 8) else "__subagents_configs_python_old__")'
+      ;;
+    *)
+      "$1" -c 'import sys; print("__subagents_configs_python_ok__" if sys.version_info >= (3, 8) else "__subagents_configs_python_old__")'
+      ;;
+  esac
+}
+
+if [ "$(python_probe python3 2>/dev/null)" = "__subagents_configs_python_ok__" ]; then
+  PYTHON=python3
+elif [ "$(python_probe python 2>/dev/null)" = "__subagents_configs_python_ok__" ]; then
+  PYTHON=python
+elif [ "$(python_probe py 2>/dev/null)" = "__subagents_configs_python_ok__" ]; then
+  PYTHON=py
+else
+  echo "error: no usable Python 3.8+ interpreter found; tried python3, python, and Windows py -3" >&2
+  exit 1
+fi
+
+run_python() {
+  if [ "$PYTHON" = "py" ]; then
+    py -3 "$@"
+  else
+    "$PYTHON" "$@"
+  fi
+}
+
+PYTHON_PLATFORM=$(run_python -c 'import sys; print(sys.platform)' 2>/dev/null) || {
+  echo "error: selected Python interpreter could not report sys.platform" >&2
+  exit 1
+}
+case "$(uname -s 2>/dev/null || echo unknown):$PYTHON_PLATFORM" in
+  MINGW*:win32|MSYS*:win32|CYGWIN*:win32)
+    command -v cygpath >/dev/null 2>&1 || {
+      echo "error: cygpath is required for Windows-native Python under Git Bash/MSYS/Cygwin" >&2
+      exit 1
+    }
+    CODEX_HOME=$(cygpath -w "$CODEX_HOME")
+    ;;
+esac
 export CODEX_HOME
-python3 - <<'PY'
+
+run_python - <<'PY'
 import base64,hashlib,json,os,pathlib,shutil,time
 home=pathlib.Path(os.environ['CODEX_HOME']).expanduser(); sf=home/'.subagents_configs-state.json'
 def h(p): return hashlib.sha256(p.read_bytes()).hexdigest()

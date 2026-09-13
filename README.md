@@ -74,11 +74,20 @@ escalation. Commit/push is only used when explicitly requested.
 
 ## Prerequisites and configuration
 
-- POSIX `sh` and `python3`.
+- POSIX `sh` and Python 3.8+.
 - Agent TOML files are validated with Python `tomllib` when available.
 - Existing `config.toml` files that require parsing need Python 3.11+
   (`tomllib`) or the installable `tomli` package. A missing parser or malformed
   TOML stops installation before destinations are changed.
+
+For a Windows Codex installation, run the installers from Git Bash. Do not run
+them from PowerShell when `bash` resolves to WSL. WSL keeps POSIX path
+semantics, and this README makes no claim that a WSL invocation targets a
+Windows Codex installation. The scripts select the first candidate that
+actually starts and reports Python 3.8+ (`python3`, then `python`, then Windows
+`py -3`). Path conversion follows the selected Python runtime: only a
+MINGW/MSYS/CYGWIN shell paired with Windows-native `sys.platform == "win32"`
+uses `cygpath -w`; POSIX-native Python keeps POSIX paths.
 
 Codex files default to `$HOME/.codex`; OpenCode files default to
 `$HOME/.config/opencode`. Set `CODEX_HOME` or `OPENCODE_HOME` to override them:
@@ -87,6 +96,12 @@ Codex files default to `$HOME/.codex`; OpenCode files default to
 CODEX_HOME=/path/to/.codex ./install.sh
 OPENCODE_HOME=/path/to/opencode ./install-opencode.sh
 ```
+
+In Git Bash, the defaults still refer to the current user's Windows home, and
+custom overrides may use Git Bash paths such as `/c/Users/name/.codex`; path
+conversion is applied only when the selected Python is Windows-native. With a
+POSIX-native Python, paths keep their POSIX meaning. On Unix, paths keep their
+normal POSIX meaning.
 
 ## Install
 
