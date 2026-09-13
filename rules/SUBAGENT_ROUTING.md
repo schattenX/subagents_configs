@@ -18,19 +18,23 @@ When delegation is justified:
 - For parallel implementation, assign explicit, non-overlapping file or module ownership in every subagent prompt. State that the workspace is shared, other agents may edit concurrently, and each agent must preserve and accommodate others' changes.
 - Trust cited findings unless verification is necessary. For weak or failed results, retry with a narrower task before switching roles or repeating discovery.
 - Detach behavioral verification from `implementer` by default. After implementation and cheap structural checks, keep the original implementer available and delegate focused test, build, lint, or type-check scopes to `code-validator`. Build a complete affected-test manifest from every added or changed test file plus directly affected existing tests. Every validator prompt must state the exact targeted command, assigned manifest entries, scope, and concurrency plan. Run all manifest entries with test-file, test-class, package, or equivalent selectors instead of substituting a whole-suite command; for example, use Gradle `test --tests ...` selectors. Prefer one validator using up to three test-runner workers when supported and concurrency-safe. Otherwise partition the complete manifest across up to three `code-validator` agents with distinct, non-overlapping shards; each shard may contain multiple test selectors. Three limits concurrent workers or agents, not the number of affected tests that must run. Do not parallelize commands that share mutable databases, fixtures, snapshots, generated files, ports, caches, or coverage outputs unless those resources are isolated.
-- When every affected unit-test manifest entry passes, do not rerun the global unit-test suite by default. Treat integration and end-to-end validation as separate scopes only when explicitly required by the task or a later routing policy. The parent classifies validator failures before requesting repairs. Consolidate likely implementation failures and resume the same implementer with `followup_task` so it retains its context and file ownership, then send the affected checks back to a validator. Prefer no more than two repair cycles before escalating unresolved, flaky, environmental, or contract-level failures.
+- When every affected unit-test manifest entry passes, do not rerun the global unit-test suite by default. Treat integration and end-to-end validation as separate scopes only when explicitly required by the task or a later routing policy. The parent classifies validator failures before requesting repairs. On validation failure, resume the original implementation agent (`quick-implementer`, `implementer`, or `implementer-complex`) with `followup_task` so it retains its context and file ownership, then send the affected checks back to a validator. Keep the original role for at most two repair cycles before escalating unresolved, flaky, environmental, or contract-level failures.
 - For a truly trivial change with one fast and obvious check, `quick-implementer` may validate directly instead of spawning a validator.
 
 Select custom agents by their exact `name` from `~/.codex/agents`:
 
 - Broad repository discovery, contract or data-flow tracing -> `code-explorer`
 - Mechanical one- or two-file change -> `quick-implementer`
-- Multi-file behavior change, debugging, or substantial tests -> `implementer`
+- Architecture- and plan-clear regular development, including ordinary multi-file behavior changes, debugging, or substantial tests -> `implementer`
+- Accepted architecture- and plan-clear complex concurrency, migrations, cross-module invariants, or multi-round difficult repairs -> `implementer-complex`
+- File count, diff size, or mechanical multi-module synchronization alone is not a reason to upgrade to `implementer-complex`
 - Focused read-only test, build, lint, or type-check execution -> `code-validator`
 - Independent review only for high-risk, security-sensitive, architectural, public-API, migration, concurrency, or difficult-to-validate changes -> `code-reviewer`
 - Escalation-only deep review — never a default or second pass; only when the standard `code-reviewer` or parent cannot reach a high-confidence verdict, or when deeper architectural, security, concurrency, migration, public-API, or cross-module invariant analysis is explicitly requested -> `code-reviewer-deep`
 - Exploratory black-box UX review for qualifying user-facing frontend changes after functional validation -> `ux-reviewer`
 - Commit and push, only when the user explicitly requests both -> `commit-pusher`
+
+`implementer-complex` is an escalation within the accepted architecture and plan, not permission to redesign them. Use the cheapest role that can reliably complete the work, and do not create parallel write conflicts.
 
 ## Escalation-Only Deep Review
 
@@ -53,6 +57,8 @@ When the standard `code-reviewer` can reach a confident verdict, stop there — 
 ## Architecture Deviation Gate
 
 The parent may decide freely on implementation details that do not change the accepted architecture or its contracts, including private/internal implementation details, helper/function/class organization, local naming, test fixture details, and other local implementation choices.
+
+All implementation roles, including `implementer-complex`, must obey this gate; complexity is not permission to silently redesign an accepted architecture or plan.
 
 If implementation would require changing an accepted architecture boundary, module ownership, public API or published port, persistent schema contract, critical data flow, concurrency/transaction model, security/trust boundary, explicit architectural invariant, or critical architecture/plan assumption, the Architecture Deviation Gate is triggered.
 
@@ -105,7 +111,7 @@ Implementation -> functional/task validation -> required E2E/build -> `ux-review
 
 When a UX finding is an implementation defect:
 
-`ux-reviewer` -> parent classifies -> `implementer`/`quick-implementer` -> deterministic regression test when appropriate -> `code-validator` -> targeted UX re-review
+`ux-reviewer` -> parent classifies complexity -> `quick-implementer`/`implementer`/`implementer-complex` -> deterministic regression test when appropriate -> `code-validator` -> targeted UX re-review
 
 When a correct fix requires changing accepted UX design:
 

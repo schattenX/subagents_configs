@@ -21,9 +21,12 @@ Use the exact agent name when delegating work.
 | --- | --- | --- |
 | `code-explorer` | GPT-5.6 Luna / low | Read-only repository discovery and decision-ready findings. |
 | `quick-implementer` | GPT-5.6 Luna / low | Small, well-scoped one- or two-file changes with focused checks. |
-| `implementer` | GPT-5.6 Luna / medium | Features and bug fixes, including targeted unit tests. |
-| `code-validator` | GPT-5.4 Mini / low | Read-only, focused test, build, lint, or type-check verification. |
-| `code-reviewer` | GPT-5.6 Sol / low | Read-only review for high-risk, public-API, or difficult changes. |
+| `implementer` | GPT-5.6 Luna / max | Default implementation for architecture- and plan-clear regular work, including targeted unit tests. |
+| `implementer-complex` | GPT-5.6 Terra / high | Accepted-plan implementation involving complex concurrency, migrations, cross-module invariants, or multi-round difficult repairs. |
+| `code-validator` | GPT-5.6 Luna / low | Read-only, focused test, build, lint, or type-check verification. |
+| `code-reviewer` | GPT-5.6 Terra / high | Read-only standard review for high-risk, public-API, or difficult changes. |
+| `code-reviewer-deep` | GPT-5.6 Sol / high | Escalation-only deep review for unresolved material risk. |
+| `ux-reviewer` | GPT-5.6 Terra / medium | Exploratory black-box UX review for qualifying user-facing frontend changes. |
 | `commit-pusher` | GPT-5.6 Luna / low | Intentional staging, conventional commit, and push—only on explicit request. |
 
 ## Orchestrator workflow
@@ -38,22 +41,36 @@ flowchart TD
     D -->|Repository discovery| E[code-explorer]
     E -->|Findings and risks| O
     D -->|Small change| Q[quick-implementer]
-    D -->|Feature or bug fix| I[implementer]
+    D -->|Architecture/plan-clear routine work| I[implementer]
+    D -->|Accepted-plan complex work| X[implementer-complex]
     Q -->|Change and focused check| O
     I -->|Change and affected-test manifest| O
+    X -->|Change and affected-test manifest| O
     O -->|Targeted validation| V[code-validator]
     V -->|Pass or actionable failure| O
-    O -->|High-risk review when warranted| R[code-reviewer]
+    O -->|Architecture deviation| G[Architecture Deviation Gate]
+    G -->|Decision accepted; resume| O
+    O -->|Standard high-risk review when warranted| R[code-reviewer]
     R -->|Findings| O
+    O -->|Qualifying UX review| UX[ux-reviewer]
+    UX -->|Findings| O
     O -->|Explicit commit and push request only| C[commit-pusher]
     C -->|Published result| O
     O --> F[Completed response]
 ```
 
 In brief, exploration and bounded implementation are delegated by default;
-validation is separate from implementation; review is for high-risk or
-difficult-to-validate changes; and commit/push is only used when explicitly
-requested.
+architecture- and plan-clear routine work goes to `implementer`, while
+`implementer-complex` is reserved for accepted-plan complex concurrency,
+migrations, cross-module invariants, or multi-round difficult repairs. File
+count, diff size, and mechanical multi-module synchronization alone do not
+justify the upgrade. Validation is separate from implementation; on failure,
+the original implementation role is resumed for at most two repair cycles.
+Every implementation role must stop at the Architecture Deviation Gate rather
+than silently changing an accepted boundary or contract. Review is for
+high-risk or difficult-to-validate changes: standard high-risk and qualifying
+UX review use Terra roles, while Sol is reserved for design and deep review
+escalation. Commit/push is only used when explicitly requested.
 
 ## Prerequisites and configuration
 

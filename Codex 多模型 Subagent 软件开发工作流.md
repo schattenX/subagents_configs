@@ -4,9 +4,9 @@
 
 这套工作流的目标不是让最强模型完成所有工作，而是根据任务的**决策价值、执行频率和推理难度**分配模型：
 
-- **Sol** 负责少量但影响范围大的设计与高风险判断；
-- **Luna** 负责绝大多数调度、探索和代码实现；
-- **GPT-5.4-mini** 负责高频、低推理需求的验证执行；
+- **Sol** 负责设计，以及标准评审无法高置信解决时的深度风险升级；
+- **Luna** 负责绝大多数调度、探索、常规实现和验证执行；
+- **Terra** 负责接受架构/计划内的复杂实现升级；
 - 测试、Build、Lint、Type Check 等确定性工具负责提供最终证据；
 - 主 Agent 负责任务编排和验收，但不能静默推翻已经接受的架构与计划。
 
@@ -42,17 +42,17 @@
                          │ Acceptance          │
                          └──────────┬──────────┘
                                     │
-                 ┌──────────────────┼──────────────────┐
-                 │                  │                  │
-                 ▼                  ▼                  ▼
-          code-explorer        implementer      quick-implementer
-            Luna-low          Luna-medium           Luna-low
-                 │                  │                  │
-                 └──────────────────┼──────────────────┘
+                 ┌──────────────────┼──────────────────┬──────────────────┐
+                 │                  │                  │                  │
+                 ▼                  ▼                  ▼                  ▼
+          code-explorer      quick-implementer     implementer    implementer-complex
+            Luna-low            Luna-low            Luna-max          Terra-high
+                 │                  │                  │                  │
+                 └──────────────────┴──────────────────┴──────────────────┴──────────────────┘
                                     │
                                     ▼
                              code-validator
-                           GPT-5.4-mini-low
+                             Luna-low
                                     │
                                PASS / FAIL
                                     │
@@ -66,7 +66,7 @@
                              No          Yes
                               │           │
                               │      code-reviewer
-                              │        Sol-low
+                              │        Terra-high
                               │           │
                               │     Confident verdict?
                               │       ┌───┴───┐
@@ -81,7 +81,7 @@
 
 这套设计遵循一个简单原则：
 
-> **让强模型决定“做什么以及设计是否正确”，让低成本模型负责“把它做出来”，让确定性工具证明“它是否真的做对”。**
+> **让 Sol 负责设计与深度判断，让 Luna 负责低成本高频执行与验证，让 Terra 负责复杂实现升级和标准高风险/UX Review，让确定性工具证明“它是否真的做对”。**
 
 ---
 
@@ -149,7 +149,7 @@ Main Agent 首先读取已经 Accepted 的：
 
 从这里开始，用户原则上不需要手动指定：
 
-> “这个任务用 Luna-low，那个任务用 Luna-medium。”
+> “这个任务用 Luna-low，那个任务用 Terra-high。”
 
 Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
 
@@ -180,13 +180,15 @@ Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
 | Main Agent | Luna-max | 调度、集成、验收、异常处理 |
 | `code-explorer` | Luna-low | Repo 搜索、Contract / Data Flow 定位 |
 | `quick-implementer` | Luna-low | 一两文件的小型机械修改 |
-| `implementer` | Luna-medium | 常规开发、Debug、Unit Tests |
-| `code-validator` | GPT-5.4-mini-low | Test / Build / Lint / Type Check |
-| `code-reviewer` | Sol-low | 高风险修改的独立 Review |
+| `implementer` | Luna-max | 架构/计划明确的常规开发、Debug、Unit Tests |
+| `implementer-complex` | Terra-high | 接受架构/计划内的复杂并发、迁移、跨模块不变量或多轮疑难修复 |
+| `code-validator` | Luna-low | Test / Build / Lint / Type Check |
+| `code-reviewer` | Terra-high | 标准高风险修改的独立 Review |
 | `code-reviewer-deep` | Sol-high | 存在重大未解决风险时的深度 Review |
+| `ux-reviewer` | Terra-medium | 符合条件的用户界面变更黑盒 UX Review |
 | `commit-pusher` | Luna-low | Commit 与 Push |
 
-当前 `implementer` 使用 Luna-medium，并负责实际代码和单元测试，但不能自己宣称 behavioral tests 已经通过；验证结果必须来自独立 Validator。
+当前 `implementer` 使用 Luna-max，负责架构/计划明确的常规代码和单元测试，但不能自己宣称 behavioral tests 已经通过；验证结果必须来自独立 Validator。`implementer-complex` 使用 Terra-high，仅用于接受架构/计划内的复杂并发、迁移、跨模块不变量或多轮疑难修复；它同样负责代码、单元测试、廉价结构检查和定向修复，行为验证仍交给 `code-validator`。
 
 ---
 
@@ -196,17 +198,17 @@ Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
                          Luna-max
                          Main Agent
                              │
-            ┌────────────────┼────────────────┐
-            │                │                │
-            ▼                ▼                ▼
-      code-explorer      implementer    quick-implementer
-        Luna-low        Luna-medium         Luna-low
-            │                │                │
-            └────────────────┼────────────────┘
+            ┌──────────────┼──────────────┼──────────────┐
+            │              │              │              │
+            ▼              ▼              ▼              ▼
+      code-explorer  quick-implementer  implementer  implementer-complex
+        Luna-low        Luna-low        Luna-max       Terra-high
+            │              │              │              │
+            └──────────────┴──────────────┴──────────────┴──────────────┘
                              │
                              ▼
                        code-validator
-                     GPT-5.4-mini-low
+                         Luna-low
                              │
                          PASS / FAIL
                              │
@@ -214,7 +216,7 @@ Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
                 │                         │
               PASS                       FAIL
                 │                         │
-          Luna-max Accept          原 Implementer Repair
+          Luna-max Accept          原实现代理 Repair
                 │                         │
                 │                    Re-validation
                 ▼
@@ -223,7 +225,7 @@ Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
           No         Yes
           │           │
        Continue   code-reviewer
-                    Sol-low
+                  Terra-high
                        │
              unresolved material risk?
                  ┌─────┴─────┐
@@ -232,6 +234,13 @@ Main Agent 根据 `SUBAGENT_ROUTING.md` 自动判断：
              verdict    code-reviewer-deep
                            Sol-high
 ```
+
+默认情况下，架构/计划明确的常规开发（包括普通多文件修改）路由到
+`implementer`。只有在仍遵守已接受架构/计划、且确实涉及复杂并发、迁移、
+跨模块不变量或多轮疑难修复时，才升级到 `implementer-complex`；文件数、
+改动量或机械多模块同步本身不是升级理由。验证失败时恢复原始实现代理
+（`quick-implementer`、`implementer` 或 `implementer-complex`），最多保留
+两轮修复后再升级未解决的问题。
 
 Routing 的几个核心原则：
 
@@ -273,7 +282,7 @@ Validator 为只读 Agent，不能为了让测试通过而修改代码。
 
 ## 4.1 Architecture Deviation Gate
 
-Luna-max 可以自行决定：
+Main Agent 与实现代理可以在不改变已接受架构和 Contract 的前提下自行决定：
 
 - private helper 如何组织；
 - 函数和类如何拆分；
@@ -290,7 +299,10 @@ Luna-max 可以自行决定：
 - Critical Data Flow；
 - Concurrency / Transaction Model；
 - Security / Trust Boundary；
+- Architecture / Cross-module Invariant；
 - Architecture / Plan 中明确的关键假设。
+
+`implementer-complex` 是已接受架构/计划内的实现升级，不是重新设计的授权；所有实现代理都必须遵守此 Gate。
 
 
 
@@ -389,9 +401,9 @@ Playwright E2E
 
 ## 4.3 Risk-driven Code Review
 
-普通代码修改不需要 Sol Review。
+普通代码修改不需要标准风险 Review。
 
-只有以下类型的修改才进入 `code-reviewer`：
+只有以下类型的修改才进入 `code-reviewer`（Terra-high）：
 
 - high-risk；
 - security-sensitive；
@@ -407,7 +419,7 @@ Playwright E2E
 
 ```text
 code-reviewer
-→ Sol-low
+→ Terra-high
 ```
 
 如果它能够高置信给出：
@@ -423,7 +435,7 @@ COMMENT
 只有仍然存在**重大且无法高置信解决的不确定性**时：
 
 ```text
-Sol-low Review
+Terra-high Review
       ↓
 Material unresolved risk
       ↓
@@ -433,6 +445,8 @@ Sol-high
 ```
 
 Deep Review 不是固定第二遍 Review，也不会因为“这是 concurrency / security / migration”就自动触发。
+
+符合条件的用户界面变更在功能验证后进入 `ux-reviewer`（Terra-medium）；UX 修复同样按复杂度返回 `quick-implementer`、`implementer` 或 `implementer-complex`。
 
 ---
 
@@ -450,18 +464,18 @@ Deep Review 不是固定第二遍 Review，也不会因为“这是 concurrency 
                     ▲
                     │
                 Sol-high
-           Architecture / Deep Risk
+        Architecture / Deep Escalation
 
-                 Sol-low
-                High-risk Review
+                Terra-high
+          High-risk / UX Review
 
                  Luna-max
               Main Orchestration
 
-               Luna-medium
-            Main Implementation
+               Luna-max / Terra-high
+          Regular / Complex Implementation
 
-        Luna-low / GPT-5.4-mini
+                 Luna-low
       Search / Quick Work / Validate
                     │
                     ▼
@@ -475,9 +489,9 @@ Deep Review 不是固定第二遍 Review，也不会因为“这是 concurrency 
 
 Architecture 错误可能导致几十个 Implementation Task 全部返工，因此值得使用 Sol-high。
 
-相反，一个明确 Plan 下的普通 CRUD、测试补充或局部修改，没有必要消耗 Sol。
+相反，一个明确 Plan 下的普通 CRUD、测试补充或局部修改，没有必要消耗 Sol；标准高风险和 UX Review 使用 Terra，只有深度升级才使用 Sol。
 
-### 2. 高频 Token 消耗放在 Luna / Mini
+### 2. 高频执行与验证放在 Luna
 
 一个版本的大部分 Agent 工作实际上来自：
 
@@ -489,7 +503,7 @@ Test Execution
 Result Summarization
 ```
 
-因此这些任务决定了长期成本，应尽量运行在低成本模型上。
+因此这些任务决定了长期成本，应由 Luna 承担低成本高频执行与验证。Terra 承担复杂实现升级和标准高风险/UX Review，Sol 仅保留设计与深度升级语境。
 
 ### 3. 控制 Sol 成本的关键是减少无意义调用
 
@@ -499,14 +513,12 @@ Result Summarization
 
 不是每一个 Task 都让 Sol 重新理解整个项目。
 
-Sol 应该出现在：
+Sol 应该只出现在：
 
 ```text
 Architecture / Planning
 +
-真正需要独立高级判断的 Review
-+
-重大 unresolved risk
+重大 unresolved risk 的 Deep Review
 ```
 
 而不是成为默认劳动力。
@@ -567,9 +579,11 @@ agents/
 ├── code-explorer.toml
 ├── quick-implementer.toml
 ├── implementer.toml
+├── implementer-complex.toml
 ├── code-validator.toml
 ├── code-reviewer.toml
 ├── code-reviewer-deep.toml
+├── ux-reviewer.toml
 └── commit-pusher.toml
 
 install.sh
@@ -606,12 +620,14 @@ Accepted
 | 不知道代码在哪里 | `code-explorer` |
 | 一两文件的小型明确修改 | `quick-implementer` |
 | 正常 Feature / Bug Fix / Debug | `implementer` |
+| 接受架构/计划内的复杂实现升级 | `implementer-complex` |
 | 跑测试、Build、Lint、Type Check | `code-validator` |
 | 高风险独立 Review | `code-reviewer` |
 | 普通 Reviewer 无法解决的深层风险 | `code-reviewer-deep` |
+| 符合条件的 UI/UX 黑盒审查 | `ux-reviewer` |
 | Commit + Push | `commit-pusher` |
 | 需要改变 Accepted Architecture | **Architecture Deviation Gate** |
 
 最终可以把整套方法记成一句话：
 
-> **Sol 负责设计与关键判断，Luna 负责管理和生产，Mini/工具负责验证；Main Agent 可以自主执行，但不能绕过 Architecture、Validation 和 Acceptance Gates。**
+> **Sol 负责设计与深度升级，Luna 负责管理、低成本高频执行与验证，Terra 负责复杂实现升级和标准高风险/UX Review；Main Agent 可以自主执行，但不能绕过 Architecture、Validation 和 Acceptance Gates。**
