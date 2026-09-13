@@ -137,7 +137,8 @@ original_segment=old[a:b+len(finish)] if a>=0 and b>=a else b''
 updated=old[:a]+block+old[b+len(finish):] if a>=0 and b>=a else old+(b'\n\n' if old else b'')+block+b'\n'
 prior_g=oldstate.get('global',{})
 g={'target':str(gf),'block':block.decode(),'before':base64.b64encode(old).decode(),'original_segment':base64.b64encode(original_segment).decode(),'ownership':'unchanged'}
-if prior_g.get('block')==block.decode() and prior_g.get('ownership')=='managed': g=prior_g
+if prior_g.get('block')==block.decode() and prior_g.get('ownership')=='managed':
+ g=dict(prior_g); g['target']=str(gf); g['block']=block.decode()
 if updated!=old:
  g['ownership']='managed'; g['backup']=backup(gf) if gf.exists() else None; gf.write_bytes(updated); print('updated:',gf)
 json.dump({'files':current,'global':g},sf.open('w'),indent=2); sf.write_text(sf.read_text()+'\n')
